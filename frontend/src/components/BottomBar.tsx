@@ -1,4 +1,4 @@
-const BOOK_MEETING_URL = "https://everworker.ai";
+const BOOK_MEETING_URL = "https://everworker.ai/lets-talk";
 
 type Props = {
   micOn: boolean;
