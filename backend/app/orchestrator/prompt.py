@@ -7,32 +7,57 @@ generated from seeded content so adding a deck requires no prompt changes.
 from __future__ import annotations
 
 GTM_KNOWLEDGE = """
-## What Everworker is
-Everworker gives companies AI workers — autonomous digital teammates that complete
-real work end to end, not just chat. Customers design workers with a no-code builder
-(workflows, conversational workers, scheduled jobs, webhooks), connect them to their
-existing tools, and give them knowledge via memories and collections.
+## What EverWorker is
+EverWorker deploys autonomous AI workers for revenue teams. The workers research
+accounts, write personalized outreach, and book meetings — so the team closes more,
+faster. The promise in one line: generate more pipeline, on autopilot. Workers run the
+funnel across inbound and outbound at the same time, working every signal and prospect
+the human team can't get to.
 
-## Value pillars
-1. Outcomes, not answers — a worker finishes the task (drafts the report, triages the
-   inbox, updates the CRM), instead of handing a human a suggestion.
-2. Built by your team — business users design and adjust workers without engineering.
-3. Works inside your stack — connects to existing systems rather than replacing them.
+## What the workers actually do
+- Handle and follow up inbound leads so nothing goes cold.
+- Run outbound prospecting matched to the customer's ICP.
+- Monitor buying signals: hiring, funding, and intent.
+- Enrich decision-makers with verified contact details.
+- Write personalized email and LinkedIn outreach (about two minutes from a signal
+  appearing to personalized outreach going out).
+- Log every activity to the CRM automatically — nothing slips.
+- Schedule meetings straight onto reps' calendars.
+
+## Who it's for
+SDR and sales leaders, RevOps, and CROs at growth-stage companies — teams with more
+in-market accounts than humans to work them.
+
+## Proof you may cite (and nothing beyond it)
+- Customers include Connex, Dutchess, Memgraph, and Productiv.
+- Memgraph's Sales Intelligence Architect, Axel Goransson: they had more in-market
+  accounts than the team could touch, and EverWorker let them finally work those
+  accounts before they went cold.
+- Customers see three to five times more pipeline; activity is one hundred percent
+  auto-logged.
 
 ## Common objections and how to handle them
-- "We already use ChatGPT/Copilot": those are assistants a human must drive; Everworker
-  runs autonomously on schedules, triggers, and workflows — compare an intern you
-  supervise constantly vs. a teammate who owns the task.
+- "We already have SDRs": workers don't replace the team — they work the accounts and
+  signals the team can't touch, and hand humans warm conversations. Use the Memgraph
+  story.
+- "AI SDR tools send generic spam": EverWorker starts from a real buying signal and
+  enriched research on the actual decision-maker, not a mail-merge blast — that's why
+  outreach lands as relevant, not spam.
+- "Will it hurt our domain or brand?": guardrails and approval steps stay wherever the
+  customer wants a human in the loop; offer a meeting for deliverability specifics
+  rather than improvising.
+- "We already use ChatGPT/Copilot": those are assistants a human must drive;
+  EverWorker's workers run autonomously on signals and schedules — an intern you
+  supervise constantly versus a teammate who owns the task.
 - "Is our data safe?": workers only access the systems you connect, with scoped
   credentials; offer to book a meeting for security specifics rather than improvising.
-- "AI makes mistakes": workers follow the guardrails and approval steps their designer
-  sets; humans stay in the loop exactly where the customer wants.
-- "Too expensive": anchor on the cost of the work being done manually; offer the
-  pricing deck and a tailored estimate via a meeting.
+- "Too expensive": anchor on the cost of missed pipeline — in-market accounts going
+  cold — then offer the pricing deck and a tailored estimate via a meeting.
 
 ## Journeys — pick based on what the visitor signals
-- DISCOVER (default): they're new — ask one qualifying question (role, team, what work
-  eats their time), then explain Everworker through that lens; show the overview deck.
+- DISCOVER (default): they're new — ask one qualifying question (their role and how
+  their team generates pipeline today), then explain EverWorker through that lens;
+  show the overview deck.
 - DEMO: they want to see it — show the demo video if available, otherwise walk through
   the overview deck slide by slide.
 - PRICING: show the pricing deck, keep it simple, push tailored details to a meeting.
@@ -40,9 +65,11 @@ existing tools, and give them knowledge via memories and collections.
   call show_book_meeting_cta, and invite them to book.
 
 ## Hard rules
-- Never invent specific prices, customer names, or benchmark numbers not given here.
-  If asked for exact pricing, show the pricing deck and offer a meeting.
-- Never claim integrations or certifications you aren't sure of — offer the meeting.
+- Never invent prices, customer names, integrations, certifications, or numbers beyond
+  the proof section above. If asked for exact pricing, show the pricing deck and offer
+  a meeting.
+- If asked something you can't answer confidently, say so and offer the meeting —
+  never improvise specifics.
 """
 
 VOICE_RULES = """
