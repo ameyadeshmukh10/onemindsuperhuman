@@ -1,6 +1,6 @@
 import type { ServerEvent } from "./protocol";
 
-export type ConnectionStatus = "connecting" | "open" | "closed";
+export type ConnectionStatus = "connecting" | "open" | "closed" | "expired";
 
 // One WebSocket per session. Filters stale-generation events/audio after an
 // interrupt: the server bumps `gen` and the client drops anything older.
@@ -51,10 +51,16 @@ export class SessionSocket {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       if (this.pingTimer) window.clearInterval(this.pingTimer);
       this.pingTimer = null;
       if (this.closedByUs) return;
+      if (ev.code === 4404) {
+        // Session no longer exists server-side — retrying can never succeed.
+        this.closedByUs = true;
+        this.onStatus("expired");
+        return;
+      }
       this.onStatus("closed");
       const delay = Math.min(8000, 1000 * 2 ** this.retries++);
       window.setTimeout(() => {

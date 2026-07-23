@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { player } from "../lib/pcmPlayer";
 import type { Persona, ServerEvent, Slide, VideoClip } from "../lib/protocol";
 import { fetchSession } from "../lib/protocol";
-import { SessionSocket } from "../lib/wsClient";
+import { SessionSocket, type ConnectionStatus } from "../lib/wsClient";
 
 export type ChatMessage = { id: string; role: "user" | "assistant"; text: string };
 export type MediaState =
@@ -15,7 +15,7 @@ export type SessionState = {
   persona: Persona | null;
   status: "idle" | "thinking" | "speaking";
   playing: boolean;
-  connection: "connecting" | "open" | "closed";
+  connection: ConnectionStatus;
   messages: ChatMessage[];
   topics: string[];
   media: MediaState;
@@ -174,7 +174,10 @@ export function useSession(sessionId: string) {
 
     const socket = new SessionSocket(sessionId);
     socketRef.current = socket;
-    socket.onStatus = (connection) => setState((s) => ({ ...s, connection }));
+    socket.onStatus = (connection) =>
+      setState((s) =>
+        connection === "expired" ? { ...s, connection, phase: "gone" } : { ...s, connection },
+      );
     socket.onEvent = handleEvent;
     socket.onAudio = (_gen, seq, pcm) => player.append(seq, pcm);
     socket.connect();
