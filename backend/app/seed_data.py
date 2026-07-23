@@ -60,10 +60,10 @@ VIDEOS = [
     {
         "_id": "demo_clip",
         "type": "video",
-        "title": "Everworker demo clip",
+        "title": "EverWorker demo reel",
         "description": (
-            "A short product demo clip showing an AI worker completing a task end to end. "
-            "Play when someone asks to see the product in action."
+            "A thirty-one second EverWorker demo reel. Play when someone asks to see "
+            "EverWorker in action, asks for a demo, or wants the quick version."
         ),
         "file": "videos/demo.mp4",
     },
