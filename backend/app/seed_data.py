@@ -36,21 +36,60 @@ SLIDE_DECKS = [
     {
         "_id": "overview_deck",
         "type": "slide_deck",
-        "title": "Everworker Overview",
+        "title": "EverWorker Overview",
         "description": (
-            "3 slides introducing Everworker: what AI workers are, how they plug into "
-            "existing tools, and example roles they can take on. Show when someone asks "
-            "what Everworker is or how it works."
+            "5 slides: 'Double your pipeline this quarter' title with customer logos, "
+            "the signal-to-booked-meeting flow, live in-market signal intelligence, "
+            "'3 to 5x more pipeline, same team', and the Memgraph $2.7M-in-90-days "
+            "results story. Show when someone asks what EverWorker is or wants the "
+            "big picture."
         ),
         "dir": "slides/overview",
+    },
+    {
+        "_id": "how_it_works_deck",
+        "type": "slide_deck",
+        "title": "How It Works",
+        "description": (
+            "4 slides: the autonomous multi-agent system architecture, signal-to-send "
+            "with zero human time, the built-in playbook (287% multi-channel "
+            "multiplier), and the 5-week go-live timeline with a forward-deployed GTM "
+            "engineer. Show when someone asks how it works under the hood or about "
+            "implementation."
+        ),
+        "dir": "slides/how_it_works",
+    },
+    {
+        "_id": "outreach_quality_deck",
+        "type": "slide_deck",
+        "title": "Outreach Quality",
+        "description": (
+            "4 slides: account-to-buying-group enrichment, deeply researched personally "
+            "written messages, landing in the primary inbox, and 2x replies safely "
+            "scaled. Show when someone doubts AI outreach quality, worries about spam, "
+            "or asks about personalization."
+        ),
+        "dir": "slides/outreach_quality",
+    },
+    {
+        "_id": "infrastructure_deck",
+        "type": "slide_deck",
+        "title": "Sending Infrastructure",
+        "description": (
+            "2 slides: email infrastructure done for you (domains, warmup, "
+            "deliverability) and LinkedIn infrastructure with human-pattern limits. "
+            "Show on domain-safety, deliverability, or account-risk concerns."
+        ),
+        "dir": "slides/infrastructure",
     },
     {
         "_id": "pricing_deck",
         "type": "slide_deck",
         "title": "Pricing & Plans",
         "description": (
-            "3 slides covering pricing tiers and what's included. Show when pricing, "
-            "cost, or plans come up."
+            "2 slides: the three packages (Starter $3.5k, Scale $5.5k, Advanced $7k "
+            "monthly) with what's included, then the 5-week go-live plan. Show whenever "
+            "pricing, cost, or plans come up."
         ),
         "dir": "slides/pricing",
     },
