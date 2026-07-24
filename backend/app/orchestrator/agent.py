@@ -33,6 +33,12 @@ FALLBACK_REPLY = (
     "or use the Book a Meeting button to reach a human."
 )
 
+NUDGE_INSTRUCTION = (
+    "[The visitor started to speak and cut you off, but then went quiet. In one "
+    "short warm sentence, hand them the floor. Do not repeat or resume your "
+    "previous point, do not show any content, and do not ask more than one thing.]"
+)
+
 
 class _Seq:
     """Shared ordering counter for sentences and UI actions within one turn."""
@@ -66,6 +72,7 @@ class SessionRunner:
         self.avatar: LiveAvatarLink | None = None
         self._pace_task: asyncio.Task | None = None
         self._pace_queue: asyncio.Queue | None = None
+        self._nudge_task: asyncio.Task | None = None
 
     # ---------- outbound ----------
 
@@ -142,6 +149,10 @@ class SessionRunner:
             self.emit({"type": "interrupted"}, self.gen)
             self.emit({"type": "state", "status": "idle"}, self.gen)
             await self.store.add_event(self.session["_id"], "interrupt")
+            if msg.get("source") == "voice":
+                # The visitor started talking over the persona. If their sentence
+                # never materializes, hand them the floor instead of dead air.
+                self._schedule_nudge()
         elif mtype == "analytics":
             await self.store.add_event(
                 self.session["_id"], str(msg.get("name", "unknown"))[:64], msg.get("props") or {}
@@ -183,6 +194,8 @@ class SessionRunner:
             self.emit({"type": "state", "status": "idle"}, gen)
 
     async def _cancel_turn(self, emit_event: bool) -> None:
+        if self._nudge_task and not self._nudge_task.done():
+            self._nudge_task.cancel()
         task, self.turn_task = self.turn_task, None
         active = task is not None and not task.done()
         self.gen += 1
@@ -202,6 +215,26 @@ class SessionRunner:
             if emit_event:
                 self.emit({"type": "interrupted"}, self.gen)
                 await self.store.add_event(self.session["_id"], "interrupt")
+
+    def _schedule_nudge(self) -> None:
+        """After a voice barge-in that trails into silence, invite the visitor
+        to go ahead — a great rep doesn't sit in dead air."""
+        if self._nudge_task and not self._nudge_task.done():
+            self._nudge_task.cancel()
+        gen_at = self.gen
+
+        async def _nudge() -> None:
+            await asyncio.sleep(7.0)
+            if self.gen != gen_at:
+                return  # a real message or another interrupt arrived meanwhile
+            if self.turn_task and not self.turn_task.done():
+                return
+            self._nudge_task = None  # _start_turn cancels pending nudges; not us
+            await self._start_turn(
+                lambda g: self._assistant_turn(g, NUDGE_INSTRUCTION, "nudge")
+            )
+
+        self._nudge_task = asyncio.create_task(_nudge())
 
     # ---------- turns ----------
 
@@ -310,9 +343,11 @@ class SessionRunner:
             raise
 
     async def _assistant_turn(self, gen: int, user_text: str, source: str) -> None:
-        await self.store.add_message(
-            self.session["_id"], {"role": "user", "text": user_text, "source": source}
-        )
+        if source != "nudge":
+            # nudge instructions are one-shot steering — never part of history
+            await self.store.add_message(
+                self.session["_id"], {"role": "user", "text": user_text, "source": source}
+            )
         self.emit({"type": "state", "status": "thinking"}, gen)
 
         relay = self._new_relay(gen)

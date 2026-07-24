@@ -12,11 +12,13 @@ export type SpeechInputState = {
 
 type Options = {
   enabled: boolean; // mic toggled on by the user
-  gated: boolean; // half-duplex: true while the persona is speaking/thinking
   onFinal: (text: string) => void;
+  // fires on partial transcripts — full duplex, so the caller can barge in the
+  // moment the visitor starts talking over the persona
+  onInterim?: (text: string) => void;
 };
 
-export function useSpeechInput({ enabled, gated, onFinal }: Options): SpeechInputState {
+export function useSpeechInput({ enabled, onFinal, onInterim }: Options): SpeechInputState {
   const Recognition =
     (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
   const supported = Boolean(Recognition);
@@ -27,6 +29,8 @@ export function useSpeechInput({ enabled, gated, onFinal }: Options): SpeechInpu
   const shouldRunRef = useRef(false);
   const onFinalRef = useRef(onFinal);
   onFinalRef.current = onFinal;
+  const onInterimRef = useRef(onInterim);
+  onInterimRef.current = onInterim;
 
   const stop = useCallback(() => {
     shouldRunRef.current = false;
@@ -54,7 +58,10 @@ export function useSpeechInput({ enabled, gated, onFinal }: Options): SpeechInpu
           interimText += result[0].transcript;
         }
       }
-      if (interimText) setInterim(interimText);
+      if (interimText) {
+        setInterim(interimText);
+        onInterimRef.current?.(interimText);
+      }
     };
     rec.onend = () => {
       recRef.current = null;
@@ -82,10 +89,10 @@ export function useSpeechInput({ enabled, gated, onFinal }: Options): SpeechInpu
   }, [supported]);
 
   useEffect(() => {
-    if (enabled && !gated) start();
+    if (enabled) start();
     else stop();
     return stop;
-  }, [enabled, gated, start, stop]);
+  }, [enabled, start, stop]);
 
   return { supported, listening, interim };
 }

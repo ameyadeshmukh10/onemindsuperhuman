@@ -227,9 +227,9 @@ export function useSession(sessionId: string) {
     socketRef.current?.send({ type: "user_message", text: trimmed, source });
   }, []);
 
-  const interrupt = useCallback(() => {
+  const interrupt = useCallback((source?: "voice") => {
     player.flush();
-    socketRef.current?.send({ type: "interrupt" });
+    socketRef.current?.send({ type: "interrupt", ...(source ? { source } : {}) });
   }, []);
 
   const sendAnalytics = useCallback((name: string, props?: Record<string, unknown>) => {

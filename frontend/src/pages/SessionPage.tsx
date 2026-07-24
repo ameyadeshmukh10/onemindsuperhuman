@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AvatarVideo from "../components/AvatarVideo";
 import BottomBar from "../components/BottomBar";
@@ -13,14 +13,56 @@ import { player } from "../lib/pcmPlayer";
 export default function SessionPage() {
   const { sessionId = "" } = useParams();
   const navigate = useNavigate();
-  const { state, sendMessage, sendAnalytics, endSession, setMedia } = useSession(sessionId);
+  const { state, sendMessage, interrupt, sendAnalytics, endSession, setMedia } =
+    useSession(sessionId);
   const [micOn, setMicOn] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
 
+  // Full-duplex politeness: the mic stays live while Evie speaks. The moment the
+  // visitor talks over her we hush her (voice interrupt); their finished sentence
+  // then becomes the next turn. Guards keep her own voice — leaking from the
+  // speakers into the mic — from triggering a self-interrupt.
+  const activeRef = useRef(false); // Evie speaking or thinking
+  const stoppedAtRef = useRef(0);
+  const bargedRef = useRef(false);
+  const evieTextRef = useRef("");
+
+  useEffect(() => {
+    const active = state.playing || state.status !== "idle";
+    if (activeRef.current && !active) stoppedAtRef.current = Date.now();
+    activeRef.current = active;
+  }, [state.playing, state.status]);
+
+  useEffect(() => {
+    const lastAssistant = [...state.messages].reverse().find((m) => m.role === "assistant");
+    evieTextRef.current = lastAssistant?.text ?? "";
+  }, [state.messages]);
+
+  const isEvieEcho = useCallback((text: string) => {
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+    const heard = norm(text);
+    if (!heard) return true;
+    const spoken = norm(evieTextRef.current);
+    return spoken.length > 0 && spoken.includes(heard);
+  }, []);
+
   const speech = useSpeechInput({
     enabled: micOn,
-    gated: state.status !== "idle" || state.playing, // half-duplex: don't hear ourselves
-    onFinal: (text) => sendMessage(text, "voice"),
+    onInterim: (text) => {
+      if (!activeRef.current || bargedRef.current) return;
+      if (text.trim().split(/\s+/).length < 2) return; // ignore blips and coughs
+      if (isEvieEcho(text)) return; // her own voice through the speakers
+      bargedRef.current = true;
+      interrupt("voice");
+    },
+    onFinal: (text) => {
+      bargedRef.current = false;
+      // right after she stops, a final can still be her own trailing echo
+      const echoWindow = activeRef.current || Date.now() - stoppedAtRef.current < 1500;
+      if (echoWindow && isEvieEcho(text)) return;
+      sendMessage(text, "voice");
+    },
   });
 
   useEffect(() => {
