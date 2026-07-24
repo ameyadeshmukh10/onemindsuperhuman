@@ -170,6 +170,12 @@ export function useSession(sessionId: string) {
           avatarRef.current = true;
           setState((s) => ({ ...s, avatar: { url: ev.url, token: ev.token } }));
           break;
+        case "avatar_ended":
+          // avatar session died and couldn't be restarted — back to portrait +
+          // browser audio (short caption fallbacks apply again)
+          avatarRef.current = false;
+          setState((s) => ({ ...s, avatar: null }));
+          break;
         case "speak_started":
           // avatar mode: backend paces these to the avatar's actual playback
           revealSentence(ev.seq);

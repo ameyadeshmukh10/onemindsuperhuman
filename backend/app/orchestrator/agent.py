@@ -94,6 +94,7 @@ class SessionRunner:
         self._pace_buffer: "_PaceBuffer | None" = None
         self._nudge_task: asyncio.Task | None = None
         self.current_deck_id: str | None = None  # last deck shown; scripts go_to_slide
+        self._avatar_restarts = 0
 
     # ---------- outbound ----------
 
@@ -258,6 +259,43 @@ class SessionRunner:
 
         self._nudge_task = asyncio.create_task(_nudge())
 
+    async def _ensure_avatar(self, gen: int) -> None:
+        """Keep the avatar alive across LiveAvatar's per-session duration cap.
+
+        At each turn boundary: rotate the session preemptively when it's close
+        to the cap (so it never dies mid-sentence), restart it if it died
+        anyway, and degrade to audio-only when restarts keep failing fast."""
+        if self.avatar is None:
+            return
+        rotate_margin = max(60.0, self.settings.heygen_max_session_secs - 90.0)
+        if self.avatar.closed:
+            # long-lived links dying is just the cap — restarts stay available;
+            # links dying young (bad key, no credits) burn the single retry
+            if self.avatar.age > 120:
+                self._avatar_restarts = 0
+        elif self.avatar.age >= rotate_margin:
+            log.info("avatar session near duration cap — rotating")
+            self._avatar_restarts = 0
+        else:
+            return
+        old, self.avatar = self.avatar, None
+        await old.close(reason="UNKNOWN")
+        if self._avatar_restarts < 1:
+            self._avatar_restarts += 1
+            self.avatar = await LiveAvatarLink.create(self.settings)
+        if self.avatar:
+            self.emit(
+                {
+                    "type": "avatar",
+                    "url": self.avatar.livekit_url,
+                    "token": self.avatar.client_token,
+                },
+                gen,
+            )
+        else:
+            log.info("avatar unavailable — continuing audio-only")
+            self.emit({"type": "avatar_ended"}, gen)
+
     # ---------- turns ----------
 
     def _new_relay(self, gen: int, seq: "_Seq") -> TtsRelay:
@@ -391,6 +429,7 @@ class SessionRunner:
                 self.session["_id"], {"role": "user", "text": user_text, "source": source}
             )
         self.emit({"type": "state", "status": "thinking"}, gen)
+        await self._ensure_avatar(gen)
 
         seq = _Seq()
         relay = self._new_relay(gen, seq)

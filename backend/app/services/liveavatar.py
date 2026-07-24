@@ -20,6 +20,7 @@ import asyncio
 import base64
 import json
 import logging
+import time
 import uuid
 from typing import Callable
 
@@ -45,6 +46,7 @@ class LiveAvatarLink:
         self._tasks: list[asyncio.Task] = []
         self._connected = asyncio.Event()
         self._closed = False
+        self.started_at = time.monotonic()
 
     @classmethod
     async def create(cls, settings) -> "LiveAvatarLink | None":
@@ -71,6 +73,7 @@ class LiveAvatarLink:
                     "mode": "LITE",
                     "avatar_id": self.settings.heygen_avatar_id,
                     "is_sandbox": self.settings.heygen_sandbox,
+                    "max_session_duration": self.settings.heygen_max_session_secs,
                 },
             )
             resp.raise_for_status()
@@ -152,11 +155,21 @@ class LiveAvatarLink:
                     if state == "connected":
                         self._connected.set()
                     elif state in ("closing", "closed"):
+                        log.info("LiveAvatar session %s reported state=%s", self.session_id, state)
                         self._closed = True
                 elif etype == "agent.speak_started":
                     self.on_playback_started()
         except Exception:
             pass
+
+    @property
+    def closed(self) -> bool:
+        """True once the LiveAvatar side is gone (duration cap, credits, drop)."""
+        return self._closed or self.ws is None
+
+    @property
+    def age(self) -> float:
+        return time.monotonic() - self.started_at
 
     # ---------- teardown ----------
 

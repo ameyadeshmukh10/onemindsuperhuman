@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     heygen_api_key: str = ""
     heygen_avatar_id: str = ""
     heygen_sandbox: bool = False
+    # LiveAvatar hard-caps session length per plan (300s on the current tier —
+    # requesting more is a 400). Sessions are rotated at turn boundaries before
+    # the cap so the avatar never dies mid-sentence; raise this if the plan does.
+    heygen_max_session_secs: int = 300
     liveavatar_api_base: str = "https://api.liveavatar.com"
     # LiveAvatar ingests PCM 16-bit 24 kHz; the browser pipeline stays on 22.05k
     avatar_tts_output_format: str = "pcm_24000"
