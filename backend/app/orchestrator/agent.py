@@ -51,6 +51,26 @@ class _Seq:
         return self.value
 
 
+class _PaceBuffer:
+    """Seq-keyed timeline items for the avatar pacer. Producers insert out of
+    order (TTS completions lag tool executions); the pacer consumes strictly
+    in seq order."""
+
+    def __init__(self) -> None:
+        self.items: dict[int, tuple] = {}
+        self.changed = asyncio.Event()
+
+    def put(self, seq: int, item: tuple) -> None:
+        self.items[seq] = item
+        self.changed.set()
+
+    async def get(self, seq: int) -> tuple:
+        while seq not in self.items:
+            self.changed.clear()
+            await self.changed.wait()
+        return self.items.pop(seq)
+
+
 class SessionRunner:
     def __init__(self, ws: WebSocket, session: dict, persona: dict, store, settings: Settings):
         self.ws = ws
@@ -71,7 +91,7 @@ class SessionRunner:
         self._last_user_text: tuple[str, float] | None = None
         self.avatar: LiveAvatarLink | None = None
         self._pace_task: asyncio.Task | None = None
-        self._pace_queue: asyncio.Queue | None = None
+        self._pace_buffer: "_PaceBuffer | None" = None
         self._nudge_task: asyncio.Task | None = None
         self.current_deck_id: str | None = None  # last deck shown; scripts go_to_slide
 
@@ -207,6 +227,7 @@ class SessionRunner:
             self.avatar.interrupt()
         if self._pace_task and not self._pace_task.done():
             self._pace_task.cancel()
+        self._pace_buffer = None
         if active:
             task.cancel()
             try:
@@ -239,32 +260,34 @@ class SessionRunner:
 
     # ---------- turns ----------
 
-    def _new_relay(self, gen: int) -> TtsRelay:
+    def _new_relay(self, gen: int, seq: "_Seq") -> TtsRelay:
         if self.avatar:
             # Avatar mode: ordered PCM goes to LiveAvatar (which lip-syncs and
             # carries the audio in its WebRTC stream) instead of the browser.
-            # LiveAvatar buffers our push into one continuous task, so captions
-            # are paced here: each utterance's duration is exact (PCM byte count)
-            # and the schedule anchors on LiveAvatar's speak_started event.
+            # LiveAvatar buffers our push into one continuous task, so the pacer
+            # below is the single conductor for the turn: it walks the seq
+            # timeline in order — sentences (exact PCM durations), failures, and
+            # UI actions — so a slide flip executes only after the sentence
+            # before it has fully finished playing, never at its start.
             bytes_per_sec = self.settings.avatar_tts_sample_rate * 2
             counts: dict[int, int] = {}
-            schedule: asyncio.Queue = asyncio.Queue()
+            buffer = _PaceBuffer()
             anchor = asyncio.Event()
             self.avatar.on_playback_started = anchor.set
-            self._pace_queue = schedule
-            self._pace_task = asyncio.create_task(self._pace(gen, schedule, anchor))
+            self._pace_buffer = buffer
+            self._pace_task = asyncio.create_task(self._pace(gen, seq, buffer, anchor))
 
             def emit_json(event: dict) -> None:
                 if event["type"] == "audio_start":
                     counts[event["seq"]] = 0
                 elif event["type"] == "audio_end":
-                    seq = event["seq"]
-                    schedule.put_nowait((seq, counts.pop(seq, 0) / bytes_per_sec))
+                    n = event["seq"]
+                    buffer.put(n, ("sentence", counts.pop(n, 0) / bytes_per_sec))
                 elif event["type"] == "audio_failed":
-                    self.emit(event, gen)
+                    buffer.put(event["seq"], ("failed", event))
 
-            def emit_bytes(seq: int, chunk: bytes) -> None:
-                counts[seq] = counts.get(seq, 0) + len(chunk)
+            def emit_bytes(n: int, chunk: bytes) -> None:
+                counts[n] = counts.get(n, 0) + len(chunk)
                 self.avatar.push_audio(chunk)
 
             return TtsRelay(
@@ -275,39 +298,60 @@ class SessionRunner:
                 output_format=self.settings.avatar_tts_output_format,
                 sample_rate=self.settings.avatar_tts_sample_rate,
             )
+        self._pace_buffer = None
         return TtsRelay(
             self.settings,
             gen,
             lambda event: self.emit(event, gen),
-            lambda seq, chunk: self.emit_bytes(gen, seq, chunk),
+            lambda n, chunk: self.emit_bytes(gen, n, chunk),
         )
 
-    async def _pace(self, gen: int, schedule: asyncio.Queue, anchor: asyncio.Event) -> None:
-        """Reveal captions in step with the avatar's actual playback."""
+    def _emit_action(self, ui_event: dict, gen: int, n: int) -> None:
+        """UI actions ride the pacer timeline in avatar mode (so they land at
+        sentence boundaries); in audio-only mode they emit immediately and the
+        client's reveal gating orders them."""
+        full = {**ui_event, "seq": n}
+        if self._pace_buffer is not None:
+            self._pace_buffer.put(n, ("action", full))
+        else:
+            self.emit(full, gen)
+
+    async def _pace(self, gen: int, seq: "_Seq", buffer: "_PaceBuffer", anchor: asyncio.Event) -> None:
+        """Walk the turn's timeline in seq order, in step with avatar playback."""
         try:
             await asyncio.wait_for(anchor.wait(), timeout=10.0)
         except asyncio.TimeoutError:
             pass  # anchor never came — pace from now; client fallbacks also apply
-        last_seq = 0
+        expected, last_seq = 1, 0
         while True:
-            item = await schedule.get()
-            if item is None:
+            kind, payload = await buffer.get(expected)
+            expected += 1
+            if kind == "end":
                 break
-            seq, duration = item
-            last_seq = seq
-            self.emit({"type": "speak_started", "seq": seq}, gen)
-            await asyncio.sleep(duration)
+            if kind == "sentence":
+                last_seq = expected - 1
+                self.emit({"type": "speak_started", "seq": last_seq}, gen)
+                await asyncio.sleep(payload)
+            elif kind in ("failed", "action"):
+                self.emit(payload, gen)
         self.emit({"type": "speak_ended", "seq": last_seq}, gen)
 
-    def _end_pace(self) -> None:
-        """Signal the pacer that the current turn has no more utterances."""
-        if self.avatar and self._pace_queue is not None:
-            self._pace_queue.put_nowait(None)
+    def _end_pace(self, seq: "_Seq | None" = None) -> None:
+        """Close out the current turn's pacing timeline."""
+        if self._pace_buffer is None:
+            return
+        if seq is not None:
+            self._pace_buffer.put(seq.next(), ("end", None))
+        else:
+            # turn died mid-way: stop pacing and release the client's playing flag
+            if self._pace_task and not self._pace_task.done():
+                self._pace_task.cancel()
+            self.emit({"type": "speak_ended", "seq": 0}, self.gen)
 
     async def _greeting_turn(self, gen: int) -> None:
         """Scripted opener: straight to TTS, no LLM call — instant and cheap."""
-        relay = self._new_relay(gen)
         seq = _Seq()
+        relay = self._new_relay(gen, seq)
         sentences: list[str] = []
         try:
             self.emit({"type": "state", "status": "speaking"}, gen)
@@ -322,16 +366,13 @@ class SessionRunner:
                 sentences.append(part)
                 self.emit({"type": "sentence", "seq": n, "text": part}, gen)
                 relay.submit(n, part)
-            self.emit(
-                {
-                    "type": "suggested_topics",
-                    "seq": seq.next(),
-                    "topics": self.persona["default_topics"],
-                },
+            self._emit_action(
+                {"type": "suggested_topics", "topics": self.persona["default_topics"]},
                 gen,
+                seq.next(),
             )
             await relay.close()
-            self._end_pace()
+            self._end_pace(seq)
             self.emit({"type": "assistant_end", "stop_reason": "end_turn"}, gen)
             self.emit({"type": "state", "status": "idle"}, gen)
             await self.store.add_message(
@@ -351,8 +392,8 @@ class SessionRunner:
             )
         self.emit({"type": "state", "status": "thinking"}, gen)
 
-        relay = self._new_relay(gen)
         seq = _Seq()
+        relay = self._new_relay(gen, seq)
         sentences: list[str] = []
         started = False
 
@@ -374,7 +415,7 @@ class SessionRunner:
             else:
                 stop_reason = await self._claude_loop(gen, user_text, dispatch_sentence, seq)
             await relay.close()
-            self._end_pace()
+            self._end_pace(seq)
             self.emit({"type": "assistant_end", "stop_reason": stop_reason or "end_turn"}, gen)
             self.emit({"type": "state", "status": "idle"}, gen)
             await self.store.add_message(
@@ -430,7 +471,7 @@ class SessionRunner:
                 if ui_event and ui_event["type"] == "show_slides":
                     self.current_deck_id = ui_event["deck_id"]
                 if ui_event:
-                    self.emit({**ui_event, "seq": seq.next()}, gen)
+                    self._emit_action(ui_event, gen, seq.next())
                     await self.store.add_event(
                         self.session["_id"], ui_event["type"], {"tool": block.name}
                     )
