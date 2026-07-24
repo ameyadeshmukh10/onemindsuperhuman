@@ -26,8 +26,22 @@ class Settings(BaseSettings):
     tts_sample_rate: int = 22050
     tts_lookahead: int = 2
 
+    # HeyGen LiveAvatar (LITE mode) — setting both key and avatar id turns avatar
+    # mode on; unset means the audio-only experience, unchanged.
+    heygen_api_key: str = ""
+    heygen_avatar_id: str = ""
+    heygen_sandbox: bool = False
+    liveavatar_api_base: str = "https://api.liveavatar.com"
+    # LiveAvatar ingests PCM 16-bit 24 kHz; the browser pipeline stays on 22.05k
+    avatar_tts_output_format: str = "pcm_24000"
+    avatar_tts_sample_rate: int = 24000
+
     mongodb_url: str = ""
     port: int = 8000
+
+    @property
+    def avatar_enabled(self) -> bool:
+        return bool(self.heygen_api_key and self.heygen_avatar_id)
 
 
 settings = Settings()

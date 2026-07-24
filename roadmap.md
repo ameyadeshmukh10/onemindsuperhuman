@@ -36,17 +36,25 @@ JFrog deployment uses "Arty", an illustrated frog — same idea).
   instead of relaying PCM to the client, sentences get sent to the avatar provider's
   session and the client renders their WebRTC video stream.
 
-## v3 — Photoreal interactive avatar streaming
+## v3 — Photoreal interactive avatar streaming  ✅ SHIPPED (2026-07)
 
-Full 1mind-style talking persona video.
+Built on **HeyGen LiveAvatar LITE mode** (the current product — HeyGen's old
+v1/v2 streaming APIs sunset 2026-10-31):
 
-- **Primary choice: HeyGen Interactive Avatar / LiveAvatar API**
-  - ~$0.10–0.20/min; LiveKit-based JS SDK; text-driven "repeat" mode fits our
-    orchestrator (we send sentences, avatar speaks them lip-synced).
+- Backend mints a LITE session (`POST /v1/sessions/token` → `/v1/sessions/start`),
+  pushes our ElevenLabs PCM (16-bit **24 kHz**, base64) over the session WebSocket
+  (`agent.speak`), and bridges interrupts via `agent.interrupt`. Our voice, their
+  lip-sync — no voice re-binding needed.
+- Frontend joins the returned LiveKit room (`livekit-client`) and renders the
+  avatar video in the stage; captions reveal on `agent.speak_started` echoes.
+- On/off switch: `HEYGEN_API_KEY` + `HEYGEN_AVATAR_ID` env vars (unset =
+  audio-only mode, unchanged). `HEYGEN_SANDBOX=true` for free watermarked testing.
+- Cost: 1 credit/min (LITE) — sessions are closed on tab close and idle out
+  after 5 min; keep-alive runs while the app WS is open.
+
+Historical evaluation notes (2026-07, kept for reference):
   - Best idle/talking behavior in 2026 comparisons; chosen by Docket for the same
-    use case over Tavus/Anam/Simli.
-  - Supports ElevenLabs voice linking, custom avatars, photo avatars.
-  - Concurrency: ~20 sessions on Essential plan; 20-min session cap.
+    use case over Tavus/Anam/Simli. Supports custom + photo avatars.
 - **Budget/latency alternative: Anam** — ~180ms latency, $0.11–0.16/min, 50 free
   minutes, direct ElevenLabs voice integration, "custom LLM" mode where their infra
   handles STT+TTS+avatar around our Python brain. Only ~5 concurrent sessions.

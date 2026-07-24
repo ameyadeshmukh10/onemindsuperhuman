@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import AvatarVideo from "../components/AvatarVideo";
 import BottomBar from "../components/BottomBar";
 import ChatPanel from "../components/ChatPanel";
 import LoadingScreen from "../components/LoadingScreen";
@@ -78,12 +79,22 @@ export default function SessionPage() {
                 state.media ? "absolute bottom-6 right-6 z-20 scale-[0.35] origin-bottom-right" : ""
               }`}
             >
-              <PersonaVisual
-                name={persona?.name ?? "E"}
-                imageUrl={persona?.image_url}
-                speaking={state.playing}
-                size={300}
-              />
+              {state.avatar ? (
+                <AvatarVideo
+                  url={state.avatar.url}
+                  token={state.avatar.token}
+                  speaking={state.playing}
+                  muted={!speakerOn}
+                  name={persona?.name ?? "E"}
+                />
+              ) : (
+                <PersonaVisual
+                  name={persona?.name ?? "E"}
+                  imageUrl={persona?.image_url}
+                  speaking={state.playing}
+                  size={300}
+                />
+              )}
             </div>
             {!state.media && persona && (
               <div className="pointer-events-none absolute bottom-8 text-center">

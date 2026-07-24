@@ -72,6 +72,8 @@ immediately. Without `MONGODB_URL` an in-memory store is used (sessions lost on 
 2. Add a **MongoDB** service to the project.
 3. On the app service set variables:
    - `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`
+   - avatar mode (optional): `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`
+     (+ `HEYGEN_SANDBOX=true` for free watermarked testing)
    - `MONGODB_URL` = `${{ MongoDB.MONGO_URL }}` (private-network reference var)
    - optional: `ANTHROPIC_MODEL`, `ELEVENLABS_VOICE_ID`
 4. Healthcheck path is `/api/health` (set in `railway.json`). Generate a domain.

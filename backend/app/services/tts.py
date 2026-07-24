@@ -27,11 +27,21 @@ EmitBytes = Callable[[int, bytes], None]
 
 
 class TtsRelay:
-    def __init__(self, settings: Settings, gen: int, emit_json: EmitJson, emit_bytes: EmitBytes):
+    def __init__(
+        self,
+        settings: Settings,
+        gen: int,
+        emit_json: EmitJson,
+        emit_bytes: EmitBytes,
+        output_format: str | None = None,
+        sample_rate: int | None = None,
+    ):
         self.settings = settings
         self.gen = gen
         self.emit_json = emit_json
         self.emit_bytes = emit_bytes
+        self.output_format = output_format or settings.tts_output_format
+        self.sample_rate = sample_rate or settings.tts_sample_rate
         self.queues: dict[int, asyncio.Queue] = {}
         self.order: asyncio.Queue[int] = asyncio.Queue()
         self.sem = asyncio.Semaphore(max(1, settings.tts_lookahead))
@@ -75,7 +85,7 @@ class TtsRelay:
         url = (
             f"https://api.elevenlabs.io/v1/text-to-speech/"
             f"{self.settings.elevenlabs_voice_id}/stream"
-            f"?output_format={self.settings.tts_output_format}"
+            f"?output_format={self.output_format}"
         )
         body: dict = {"text": text, "model_id": self.settings.elevenlabs_model}
         if prev:
@@ -105,7 +115,7 @@ class TtsRelay:
                     "type": "audio_start",
                     "seq": seq,
                     "format": "pcm_s16le",
-                    "sample_rate": self.settings.tts_sample_rate,
+                    "sample_rate": self.sample_rate,
                 }
             )
             item = first

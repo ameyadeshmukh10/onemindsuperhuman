@@ -20,6 +20,7 @@ from anthropic import AsyncAnthropic
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ..config import Settings
+from ..services.liveavatar import LiveAvatarLink
 from ..services.tts import TtsRelay
 from . import tools as tools_mod
 from .chunker import SentenceChunker
@@ -58,6 +59,7 @@ class SessionRunner:
         self.claude = AsyncAnthropic() if settings.anthropic_api_key else None
         self.content_items: list[dict] = []
         self._last_user_text: tuple[str, float] | None = None
+        self.avatar: LiveAvatarLink | None = None
 
     # ---------- outbound ----------
 
@@ -81,6 +83,26 @@ class SessionRunner:
         self.writer_task = asyncio.create_task(self._writer())
         self.content_items = await self.store.list_content_items()
 
+        if self.settings.avatar_enabled:
+            self.avatar = await LiveAvatarLink.create(self.settings)
+            if self.avatar:
+                # LiveAvatar echoes our "u:<gen>:<seq>" event ids when the avatar
+                # actually starts/finishes an utterance — that drives caption sync.
+                self.avatar.on_speak_started = lambda gen, seq: self.emit(
+                    {"type": "speak_started", "seq": seq}, gen
+                )
+                self.avatar.on_speak_ended = lambda gen, seq: self.emit(
+                    {"type": "speak_ended", "seq": seq}, gen
+                )
+                self.emit(
+                    {
+                        "type": "avatar",
+                        "url": self.avatar.livekit_url,
+                        "token": self.avatar.client_token,
+                    },
+                    self.gen,
+                )
+
         history = await self.store.get_messages(self.session["_id"])
         if not history:
             await self._start_turn(self._greeting_turn)
@@ -99,6 +121,8 @@ class SessionRunner:
             pass
         finally:
             await self._cancel_turn(emit_event=False)
+            if self.avatar:
+                await self.avatar.close()  # bills per minute — never leave running
             if self.writer_task:
                 self.writer_task.cancel()
 
@@ -163,6 +187,8 @@ class SessionRunner:
         task, self.turn_task = self.turn_task, None
         active = task is not None and not task.done()
         self.gen += 1
+        if active and self.avatar:
+            self.avatar.interrupt()  # clears queued + avatar-buffered speech
         if active:
             task.cancel()
             try:
@@ -176,6 +202,31 @@ class SessionRunner:
     # ---------- turns ----------
 
     def _new_relay(self, gen: int) -> TtsRelay:
+        if self.avatar:
+            # Avatar mode: ordered PCM goes to LiveAvatar (which lip-syncs and
+            # carries the audio in its WebRTC stream) instead of the browser.
+            # audio_failed still reaches the client so text reveals without audio.
+            pending_first: set[int] = set()
+
+            def emit_json(event: dict) -> None:
+                if event["type"] == "audio_start":
+                    pending_first.add(event["seq"])
+                elif event["type"] == "audio_failed":
+                    self.emit(event, gen)
+
+            def emit_bytes(seq: int, chunk: bytes) -> None:
+                tag = (gen, seq) if seq in pending_first else None
+                pending_first.discard(seq)
+                self.avatar.push_audio(chunk, utterance=tag)
+
+            return TtsRelay(
+                self.settings,
+                gen,
+                emit_json,
+                emit_bytes,
+                output_format=self.settings.avatar_tts_output_format,
+                sample_rate=self.settings.avatar_tts_sample_rate,
+            )
         return TtsRelay(
             self.settings,
             gen,

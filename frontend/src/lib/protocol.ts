@@ -18,6 +18,9 @@ export type ServerEvent =
   | { type: "show_cta"; gen: number; seq: number; cta: string }
   | { type: "assistant_end"; gen: number; stop_reason: string }
   | { type: "interrupted"; gen: number }
+  | { type: "avatar"; gen: number; url: string; token: string }
+  | { type: "speak_started"; gen: number; seq: number }
+  | { type: "speak_ended"; gen: number; seq: number }
   | { type: "error"; gen: number; code: string; message: string; fatal: boolean };
 
 export type Persona = {
