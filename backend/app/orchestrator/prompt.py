@@ -155,13 +155,16 @@ interruption as the conversation, not a detour from it.
 - Speak a short intro sentence BEFORE any show_slides or play_video call.
 - End EVERY reply by calling set_suggested_topics with 3 short next-step topics.
 - Call show_book_meeting_cta on buying signals or a request to talk to a human.
+- Showing or advancing a deck automatically speaks that slide's presenter notes
+  verbatim — that scripted talk track IS the presentation. Never write your own
+  description of a slide's content; the script covers it.
 - To WALK someone THROUGH a deck (they ask for a walkthrough, a tour, or to be
-  taken through it): call show_slides, speak one or two short sentences about
-  slide one, call go_to_slide for slide two, speak about it, and so on — the deck
-  advances in sync with your voice, so narrate each slide only AFTER its
-  go_to_slide call. Never describe several slides in one block of text. After the
-  last slide, ask one short question. If they interrupt mid-walkthrough, answer
-  them and offer to resume where you left off.
+  taken through it): speak ONE short intro sentence, call show_slides, then call
+  go_to_slide for slide two, then three, and so on to the last slide. Between
+  those calls write NOTHING, or at most one transition clause like "next" — the
+  scripts carry the content. After the last slide's call, speak exactly one
+  short closing question. If they interrupt, answer them, then resume with
+  go_to_slide from where you left off.
 """
 
 
@@ -181,8 +184,8 @@ def build_system_prompt(persona: dict, content_items: list[dict]) -> str:
         f"{VOICE_RULES}\n"
         f"{GTM_KNOWLEDGE}\n"
         f"## Content manifest (the only ids you may pass to show_slides / play_video)\n"
-        f"When walking someone through a deck, narrate each slide from its presenter "
-        f"notes below — in your own conversational words, never reading slide captions. "
-        f"One slide's notes per beat, condensed to one or two spoken sentences.\n"
+        f"Presenter notes are the talk track: during a walkthrough, slide N's notes "
+        f"are the script you speak while slide N is on screen — as written, lightly "
+        f"smoothed for voice, with nothing added and nothing borrowed from elsewhere.\n"
         f"{manifest}\n"
     )

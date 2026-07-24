@@ -50,6 +50,12 @@ export function useSession(sessionId: string) {
   const sentencesRef = useRef<Map<number, PendingSentence>>(new Map());
   const actionsRef = useRef<PendingAction[]>([]);
   const assistantIdRef = useRef<string | null>(null);
+  // Avatar mode: reveals are paced by the backend to actual avatar speech, so
+  // the safety timers below become a long-stop only (a turn can speak for 60s+
+  // after generation finishes). Audio-only mode keeps the short fallbacks.
+  const avatarRef = useRef(false);
+  const revealTimeout = () => (avatarRef.current ? 60000 : 3500);
+  const endTimeout = () => (avatarRef.current ? 60000 : 2500);
 
   const applyAction = useCallback((ev: ServerEvent) => {
     setState((s) => {
@@ -130,7 +136,7 @@ export function useSession(sessionId: string) {
           break;
         }
         case "sentence": {
-          const timer = window.setTimeout(() => revealSentence(ev.seq), 3500);
+          const timer = window.setTimeout(() => revealSentence(ev.seq), revealTimeout());
           sentencesRef.current.set(ev.seq, { text: ev.text, revealed: false, timer });
           break;
         }
@@ -151,7 +157,7 @@ export function useSession(sessionId: string) {
             const sentence = sentencesRef.current.get(seq)!;
             if (!sentence.revealed) {
               window.clearTimeout(sentence.timer);
-              sentence.timer = window.setTimeout(() => revealSentence(seq), 2500);
+              sentence.timer = window.setTimeout(() => revealSentence(seq), endTimeout());
             }
           }
           break;
@@ -161,6 +167,7 @@ export function useSession(sessionId: string) {
           setState((s) => ({ ...s, playing: false }));
           break;
         case "avatar":
+          avatarRef.current = true;
           setState((s) => ({ ...s, avatar: { url: ev.url, token: ev.token } }));
           break;
         case "speak_started":

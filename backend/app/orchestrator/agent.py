@@ -73,6 +73,7 @@ class SessionRunner:
         self._pace_task: asyncio.Task | None = None
         self._pace_queue: asyncio.Queue | None = None
         self._nudge_task: asyncio.Task | None = None
+        self.current_deck_id: str | None = None  # last deck shown; scripts go_to_slide
 
     # ---------- outbound ----------
 
@@ -423,12 +424,26 @@ class SessionRunner:
             for block in final.content:
                 if block.type != "tool_use":
                     continue
-                ui_event, result = tools_mod.execute(block.name, block.input, self.content_items)
+                ui_event, result, speech = tools_mod.execute(
+                    block.name, block.input, self.content_items, self.current_deck_id
+                )
+                if ui_event and ui_event["type"] == "show_slides":
+                    self.current_deck_id = ui_event["deck_id"]
                 if ui_event:
                     self.emit({**ui_event, "seq": seq.next()}, gen)
                     await self.store.add_event(
                         self.session["_id"], ui_event["type"], {"tool": block.name}
                     )
+                if speech:
+                    # Deterministic walkthrough narration: the presenter notes are
+                    # spoken verbatim server-side, sentence by sentence, riding the
+                    # same seq spine — so TTS/avatar pacing and slide flips hold.
+                    script_chunker = SentenceChunker()
+                    for sent in script_chunker.feed(speech):
+                        dispatch_sentence(sent)
+                    tail = script_chunker.flush()
+                    if tail:
+                        dispatch_sentence(tail)
                 tool_results.append(
                     {"type": "tool_result", "tool_use_id": block.id, "content": result}
                 )

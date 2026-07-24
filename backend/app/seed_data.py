@@ -201,6 +201,7 @@ async def seed(store) -> None:
                 "title": deck["title"],
                 "description": deck["description"],
                 "assets": [f"/content/{deck['dir']}/{name}" for name in slides],
+                "presenter_notes": deck.get("presenter_notes") or [],
             }
         )
 
