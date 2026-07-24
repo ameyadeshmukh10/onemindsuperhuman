@@ -7,9 +7,11 @@ and streams the same ElevenLabs PCM the audio-only mode would have played in the
 browser (16-bit 24 kHz, base64, <=1MB per packet). `agent.interrupt` clears
 everything buffered avatar-side, mirroring our gen-bump interrupt.
 
-Caption sync: the first packet of each utterance carries event_id "u:<gen>:<seq>".
-LiveAvatar echoes event_id on agent.speak_started / agent.speak_ended, which we
-surface via callbacks so the client reveals text when the avatar actually speaks.
+Caption sync: LiveAvatar buffers pushed audio into one continuous task and does
+NOT echo per-packet event ids — it emits a single agent.speak_started when
+playback begins. We surface that via on_playback_started; the SessionRunner then
+paces per-sentence caption reveals itself using each utterance's exact PCM
+duration (verified against the live API 2026-07-23).
 """
 
 from __future__ import annotations
@@ -30,16 +32,6 @@ CONNECTED_TIMEOUT = 12.0
 KEEPALIVE_INTERVAL = 60.0
 
 
-def _parse_utterance_id(event_id: str) -> tuple[int, int] | None:
-    parts = event_id.split(":") if event_id else []
-    if len(parts) == 3 and parts[0] == "u":
-        try:
-            return int(parts[1]), int(parts[2])
-        except ValueError:
-            return None
-    return None
-
-
 class LiveAvatarLink:
     def __init__(self, settings):
         self.settings = settings
@@ -48,8 +40,7 @@ class LiveAvatarLink:
         self.livekit_url: str | None = None
         self.client_token: str | None = None
         self.ws = None
-        self.on_speak_started: Callable[[int, int], None] = lambda gen, seq: None
-        self.on_speak_ended: Callable[[int, int], None] = lambda gen, seq: None
+        self.on_playback_started: Callable[[], None] = lambda: None
         self._out_q: asyncio.Queue = asyncio.Queue()
         self._tasks: list[asyncio.Task] = []
         self._connected = asyncio.Event()
@@ -114,14 +105,11 @@ class LiveAvatarLink:
 
     # ---------- outbound (single sender preserves relay ordering) ----------
 
-    def push_audio(self, pcm: bytes, utterance: tuple[int, int] | None = None) -> None:
-        """Queue one PCM chunk. `utterance` tags the first chunk of a sentence."""
-        packet: dict = {"type": "agent.speak", "audio": base64.b64encode(pcm).decode()}
-        if utterance is not None:
-            packet["event_id"] = f"u:{utterance[0]}:{utterance[1]}"
-        else:
-            packet["event_id"] = uuid.uuid4().hex
-        self._out_q.put_nowait(packet)
+    def push_audio(self, pcm: bytes) -> None:
+        """Queue one PCM chunk (24 kHz s16le mono, base64-encoded on send)."""
+        self._out_q.put_nowait(
+            {"type": "agent.speak", "audio": base64.b64encode(pcm).decode()}
+        )
 
     def interrupt(self) -> None:
         """Drop any unsent audio, then clear everything buffered avatar-side."""
@@ -158,21 +146,15 @@ class LiveAvatarLink:
                 except (json.JSONDecodeError, TypeError):
                     continue
                 etype = ev.get("type")
+                log.debug("inbound %s: %s", etype, str(ev)[:300])
                 if etype == "session.state_updated":
                     state = ev.get("state")
                     if state == "connected":
                         self._connected.set()
                     elif state in ("closing", "closed"):
                         self._closed = True
-                elif etype in ("agent.speak_started", "agent.speak_ended"):
-                    tagged = _parse_utterance_id(str(ev.get("event_id", "")))
-                    if tagged:
-                        cb = (
-                            self.on_speak_started
-                            if etype == "agent.speak_started"
-                            else self.on_speak_ended
-                        )
-                        cb(*tagged)
+                elif etype == "agent.speak_started":
+                    self.on_playback_started()
         except Exception:
             pass
 

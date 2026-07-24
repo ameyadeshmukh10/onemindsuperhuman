@@ -56,10 +56,16 @@ class SessionRunner:
         self.turn_task: asyncio.Task | None = None
         self.out_q: asyncio.Queue = asyncio.Queue()
         self.writer_task: asyncio.Task | None = None
-        self.claude = AsyncAnthropic() if settings.anthropic_api_key else None
+        self.claude = (
+            AsyncAnthropic(api_key=settings.anthropic_api_key)
+            if settings.anthropic_api_key
+            else None
+        )
         self.content_items: list[dict] = []
         self._last_user_text: tuple[str, float] | None = None
         self.avatar: LiveAvatarLink | None = None
+        self._pace_task: asyncio.Task | None = None
+        self._pace_queue: asyncio.Queue | None = None
 
     # ---------- outbound ----------
 
@@ -86,14 +92,6 @@ class SessionRunner:
         if self.settings.avatar_enabled:
             self.avatar = await LiveAvatarLink.create(self.settings)
             if self.avatar:
-                # LiveAvatar echoes our "u:<gen>:<seq>" event ids when the avatar
-                # actually starts/finishes an utterance — that drives caption sync.
-                self.avatar.on_speak_started = lambda gen, seq: self.emit(
-                    {"type": "speak_started", "seq": seq}, gen
-                )
-                self.avatar.on_speak_ended = lambda gen, seq: self.emit(
-                    {"type": "speak_ended", "seq": seq}, gen
-                )
                 self.emit(
                     {
                         "type": "avatar",
@@ -177,6 +175,7 @@ class SessionRunner:
             raise
         except Exception:
             log.exception("turn failed")
+            self._end_pace()
             self.emit(
                 {"type": "error", "code": "turn_failed", "message": "turn failed", "fatal": False},
                 gen,
@@ -187,8 +186,13 @@ class SessionRunner:
         task, self.turn_task = self.turn_task, None
         active = task is not None and not task.done()
         self.gen += 1
-        if active and self.avatar:
-            self.avatar.interrupt()  # clears queued + avatar-buffered speech
+        if self.avatar:
+            # Always clear avatar-side buffered speech: the turn task can be done
+            # while the avatar is still speaking what it buffered (it plays in
+            # real time; we push faster than real time).
+            self.avatar.interrupt()
+        if self._pace_task and not self._pace_task.done():
+            self._pace_task.cancel()
         if active:
             task.cancel()
             try:
@@ -205,19 +209,29 @@ class SessionRunner:
         if self.avatar:
             # Avatar mode: ordered PCM goes to LiveAvatar (which lip-syncs and
             # carries the audio in its WebRTC stream) instead of the browser.
-            # audio_failed still reaches the client so text reveals without audio.
-            pending_first: set[int] = set()
+            # LiveAvatar buffers our push into one continuous task, so captions
+            # are paced here: each utterance's duration is exact (PCM byte count)
+            # and the schedule anchors on LiveAvatar's speak_started event.
+            bytes_per_sec = self.settings.avatar_tts_sample_rate * 2
+            counts: dict[int, int] = {}
+            schedule: asyncio.Queue = asyncio.Queue()
+            anchor = asyncio.Event()
+            self.avatar.on_playback_started = anchor.set
+            self._pace_queue = schedule
+            self._pace_task = asyncio.create_task(self._pace(gen, schedule, anchor))
 
             def emit_json(event: dict) -> None:
                 if event["type"] == "audio_start":
-                    pending_first.add(event["seq"])
+                    counts[event["seq"]] = 0
+                elif event["type"] == "audio_end":
+                    seq = event["seq"]
+                    schedule.put_nowait((seq, counts.pop(seq, 0) / bytes_per_sec))
                 elif event["type"] == "audio_failed":
                     self.emit(event, gen)
 
             def emit_bytes(seq: int, chunk: bytes) -> None:
-                tag = (gen, seq) if seq in pending_first else None
-                pending_first.discard(seq)
-                self.avatar.push_audio(chunk, utterance=tag)
+                counts[seq] = counts.get(seq, 0) + len(chunk)
+                self.avatar.push_audio(chunk)
 
             return TtsRelay(
                 self.settings,
@@ -233,6 +247,28 @@ class SessionRunner:
             lambda event: self.emit(event, gen),
             lambda seq, chunk: self.emit_bytes(gen, seq, chunk),
         )
+
+    async def _pace(self, gen: int, schedule: asyncio.Queue, anchor: asyncio.Event) -> None:
+        """Reveal captions in step with the avatar's actual playback."""
+        try:
+            await asyncio.wait_for(anchor.wait(), timeout=10.0)
+        except asyncio.TimeoutError:
+            pass  # anchor never came — pace from now; client fallbacks also apply
+        last_seq = 0
+        while True:
+            item = await schedule.get()
+            if item is None:
+                break
+            seq, duration = item
+            last_seq = seq
+            self.emit({"type": "speak_started", "seq": seq}, gen)
+            await asyncio.sleep(duration)
+        self.emit({"type": "speak_ended", "seq": last_seq}, gen)
+
+    def _end_pace(self) -> None:
+        """Signal the pacer that the current turn has no more utterances."""
+        if self.avatar and self._pace_queue is not None:
+            self._pace_queue.put_nowait(None)
 
     async def _greeting_turn(self, gen: int) -> None:
         """Scripted opener: straight to TTS, no LLM call — instant and cheap."""
@@ -261,6 +297,7 @@ class SessionRunner:
                 gen,
             )
             await relay.close()
+            self._end_pace()
             self.emit({"type": "assistant_end", "stop_reason": "end_turn"}, gen)
             self.emit({"type": "state", "status": "idle"}, gen)
             await self.store.add_message(
@@ -301,6 +338,7 @@ class SessionRunner:
             else:
                 stop_reason = await self._claude_loop(gen, user_text, dispatch_sentence, seq)
             await relay.close()
+            self._end_pace()
             self.emit({"type": "assistant_end", "stop_reason": stop_reason or "end_turn"}, gen)
             self.emit({"type": "state", "status": "idle"}, gen)
             await self.store.add_message(

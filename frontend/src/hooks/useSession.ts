@@ -50,8 +50,6 @@ export function useSession(sessionId: string) {
   const sentencesRef = useRef<Map<number, PendingSentence>>(new Map());
   const actionsRef = useRef<PendingAction[]>([]);
   const assistantIdRef = useRef<string | null>(null);
-  // avatar mode: utterances the avatar has started but not finished speaking
-  const avatarActiveRef = useRef(0);
 
   const applyAction = useCallback((ev: ServerEvent) => {
     setState((s) => {
@@ -149,21 +147,19 @@ export function useSession(sessionId: string) {
         case "interrupted":
           player.flush();
           clearPending();
-          avatarActiveRef.current = 0;
           setState((s) => ({ ...s, playing: false }));
           break;
         case "avatar":
           setState((s) => ({ ...s, avatar: { url: ev.url, token: ev.token } }));
           break;
         case "speak_started":
-          // avatar mode caption sync: the avatar just started this utterance
-          avatarActiveRef.current += 1;
+          // avatar mode: backend paces these to the avatar's actual playback
           revealSentence(ev.seq);
           setState((s) => ({ ...s, playing: true }));
           break;
         case "speak_ended":
-          avatarActiveRef.current = Math.max(0, avatarActiveRef.current - 1);
-          if (avatarActiveRef.current === 0) setState((s) => ({ ...s, playing: false }));
+          // one per turn, after the last utterance's duration has elapsed
+          setState((s) => ({ ...s, playing: false }));
           break;
         case "error":
           console.warn("server error event:", ev);
