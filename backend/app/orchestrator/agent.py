@@ -392,7 +392,7 @@ class SessionRunner:
         system = build_system_prompt(self.persona, self.content_items)
         stop_reason = "end_turn"
 
-        for _round in range(6):  # hard cap on tool-use continuations
+        for _round in range(12):  # cap on tool-use continuations (walkthroughs use ~1/slide)
             chunker = SentenceChunker()
             async with self.claude.messages.stream(
                 model=self.settings.anthropic_model,

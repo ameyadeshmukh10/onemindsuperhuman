@@ -56,6 +56,16 @@ export function useSession(sessionId: string) {
       switch (ev.type) {
         case "show_slides":
           return { ...s, media: { kind: "slides", title: ev.title, slides: ev.slides, index: 0 } };
+        case "go_to_slide":
+          return s.media?.kind === "slides"
+            ? {
+                ...s,
+                media: {
+                  ...s.media,
+                  index: Math.min(s.media.slides.length - 1, Math.max(0, ev.index)),
+                },
+              }
+            : s;
         case "play_video":
           return { ...s, media: { kind: "video", video: ev.video } };
         case "suggested_topics":
@@ -128,6 +138,7 @@ export function useSession(sessionId: string) {
           revealSentence(ev.seq);
           break;
         case "show_slides":
+        case "go_to_slide":
         case "play_video":
         case "suggested_topics":
         case "show_cta":

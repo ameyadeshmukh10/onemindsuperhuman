@@ -13,6 +13,7 @@ export type ServerEvent =
   | { type: "audio_end"; gen: number; seq: number }
   | { type: "audio_failed"; gen: number; seq: number }
   | { type: "show_slides"; gen: number; seq: number; deck_id: string; title: string; slides: Slide[] }
+  | { type: "go_to_slide"; gen: number; seq: number; index: number }
   | { type: "play_video"; gen: number; seq: number; video: VideoClip }
   | { type: "suggested_topics"; gen: number; seq: number; topics: string[] }
   | { type: "show_cta"; gen: number; seq: number; cta: string }

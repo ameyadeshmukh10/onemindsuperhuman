@@ -27,6 +27,26 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "go_to_slide",
+        "description": (
+            "While a slide deck is on screen, move it to a specific slide (1-based). "
+            "Use it to present a deck the way a rep would: say a sentence or two about "
+            "the current slide, call go_to_slide for the next one, then talk about that "
+            "one. The deck advances exactly when your narration reaches it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "slide_number": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "1-based slide number within the deck currently shown",
+                }
+            },
+            "required": ["slide_number"],
+        },
+    },
+    {
         "name": "play_video",
         "description": (
             "Play a demo video clip in the media pane. Always speak a sentence introducing "
@@ -87,6 +107,15 @@ def execute(name: str, tool_input: dict, content_items: list[dict]) -> tuple[dic
             for n, url in enumerate(deck["assets"])
         ]
         return {"type": "show_slides", "deck_id": deck["_id"], "title": deck["title"], "slides": slides}, "ok — slides are now visible"
+
+    if name == "go_to_slide":
+        try:
+            number = int(tool_input.get("slide_number", 0))
+        except (TypeError, ValueError):
+            number = 0
+        if number < 1:
+            return None, "error: slide_number must be a 1-based integer"
+        return {"type": "go_to_slide", "index": number - 1}, f"ok — deck is on slide {number}"
 
     if name == "play_video":
         video = items.get(tool_input.get("video_id", ""))
