@@ -100,7 +100,7 @@ export default function SessionPage() {
 
       <header className="flex items-center justify-center py-4">
         <span className="text-xl font-bold tracking-tight">
-          ever<span className="text-accent">worker</span>
+          si<span className="text-accent">rin</span>
         </span>
       </header>
 

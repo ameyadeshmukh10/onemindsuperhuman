@@ -29,7 +29,7 @@ export default function Landing() {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-center py-5">
         <span className="text-2xl font-bold tracking-tight">
-          ever<span className="text-accent">worker</span>
+          si<span className="text-accent">rin</span>
         </span>
       </header>
 
