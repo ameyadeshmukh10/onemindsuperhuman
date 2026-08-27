@@ -66,6 +66,18 @@ immediately. Without `MONGODB_URL` an in-memory store is used (sessions lost on 
 - Persona voice, greeting, topics, and the GTM system prompt:
   `backend/app/seed_data.py` and `backend/app/orchestrator/prompt.py`.
 
+## Rebranding for a company
+
+The whole experience (theme, wordmark, persona, GTM knowledge, decks, CTA) can
+be reconfigured for any B2B company from its website URL with the
+`brand-onboarding` Claude Code skill (`.claude/skills/brand-onboarding/`):
+ask Claude Code to "onboard https://company.com". It researches the company
+with a strict no-fabrication policy, applies the configuration, relaunches the
+app, and then walks through a validation checklist with you
+(`onboarding/<company>/VALIDATION.md`). Brand seams it relies on: the
+`@theme` block in `frontend/src/index.css`, `frontend/src/brand.ts`, and the
+two backend content files above.
+
 ## Deploy (Railway)
 
 1. Push this repo to GitHub; create a Railway project from it (Dockerfile is detected).
