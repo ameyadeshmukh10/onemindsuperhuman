@@ -55,7 +55,7 @@ async def main():
         print(f"greeting ok — audio={'yes' if has_audio else 'no (audio_failed fallback)'}")
 
         # 2. a normal turn
-        await ws.send(json.dumps({"type": "user_message", "text": "What is Everworker?", "source": "typed"}))
+        await ws.send(json.dumps({"type": "user_message", "text": "What do you offer?", "source": "typed"}))
         events = await collect_until(ws, {"assistant_end"})
         sentences = [e for e in events if e["type"] == "sentence"]
         assert sentences, "no reply sentences"

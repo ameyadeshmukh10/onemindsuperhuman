@@ -15,7 +15,7 @@ export default function TopicChips({ topics, disabled, onPick }: Props) {
             key={topic}
             disabled={disabled}
             onClick={() => onPick(topic)}
-            className="rounded-full border border-accent/50 px-3.5 py-1.5 text-[13px] text-emerald-100 transition hover:bg-accent/10 disabled:opacity-40"
+            className="rounded-full border border-accent/50 px-3.5 py-1.5 text-[13px] text-accent-soft-2 transition hover:bg-accent/10 disabled:opacity-40"
           >
             {topic}
           </button>

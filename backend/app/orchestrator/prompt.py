@@ -178,9 +178,10 @@ def build_system_prompt(persona: dict, content_items: list[dict]) -> str:
             manifest_lines.append(f"    slide {n} notes: {note}")
     manifest = "\n".join(manifest_lines) or "- (no visual content is loaded yet)"
 
+    company = persona.get("company", persona["name"])
     return (
         f"You are {persona['name']}, {persona['tagline']} — an AI sales guide on the "
-        f"Everworker website, speaking with a visitor in real time.\n"
+        f"{company} website, speaking with a visitor in real time.\n"
         f"{VOICE_RULES}\n"
         f"{GTM_KNOWLEDGE}\n"
         f"## Content manifest (the only ids you may pass to show_slides / play_video)\n"

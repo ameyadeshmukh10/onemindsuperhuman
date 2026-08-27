@@ -32,6 +32,9 @@ class MemoryStore:
     async def upsert_content_item(self, doc: dict) -> None:
         self.content_items[doc["_id"]] = doc
 
+    async def prune_content_items(self, keep: set[str]) -> None:
+        self.content_items = {k: v for k, v in self.content_items.items() if k in keep}
+
     async def get_persona(self, persona_id: str) -> dict | None:
         return self.personas.get(persona_id)
 
@@ -88,6 +91,9 @@ class MongoStore:
 
     async def upsert_content_item(self, doc: dict) -> None:
         await self.db.content_items.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+
+    async def prune_content_items(self, keep: set[str]) -> None:
+        await self.db.content_items.delete_many({"_id": {"$nin": list(keep)}})
 
     async def get_persona(self, persona_id: str) -> dict | None:
         return await self.db.personas.find_one({"_id": persona_id})
