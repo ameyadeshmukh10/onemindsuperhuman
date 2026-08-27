@@ -10,6 +10,8 @@ from .config import CONTENT_DIR, settings
 PERSONA = {
     "_id": "evie",
     "name": "Evie",
+    "company": "EverWorker",
+    "website": "everworker.ai",
     "tagline": "Your Everworker Guide",
     "description": (
         "Evie is our AI-powered guide, here to show you how EverWorker's autonomous AI "
@@ -189,11 +191,13 @@ async def seed(store) -> None:
             break
     await store.upsert_persona(persona)
 
+    seeded_ids: set[str] = set()
     for deck in SLIDE_DECKS:
         deck_dir = CONTENT_DIR / deck["dir"]
         slides = sorted(p.name for p in deck_dir.glob("*.png")) if deck_dir.exists() else []
         if not slides:
             continue
+        seeded_ids.add(deck["_id"])
         await store.upsert_content_item(
             {
                 "_id": deck["_id"],
@@ -208,6 +212,7 @@ async def seed(store) -> None:
     for video in VIDEOS:
         if not (CONTENT_DIR / video["file"]).exists():
             continue
+        seeded_ids.add(video["_id"])
         await store.upsert_content_item(
             {
                 "_id": video["_id"],
@@ -217,3 +222,7 @@ async def seed(store) -> None:
                 "assets": [f"/content/{video['file']}"],
             }
         )
+
+    # Content removed or renamed here must not linger from a previous seed
+    # (a rebrand would otherwise keep serving the old brand's decks from Mongo).
+    await store.prune_content_items(seeded_ids)

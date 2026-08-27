@@ -28,13 +28,7 @@ export default function PersonaVisual({ name, imageUrl, speaking, size = 280 }: 
           className="h-full w-full rounded-full border-2 border-line object-cover"
         />
       ) : (
-        <div
-          className="flex h-full w-full items-center justify-center rounded-full border-2 border-line"
-          style={{
-            background:
-              "radial-gradient(circle at 35% 30%, #2dd4bf22 0%, transparent 45%), linear-gradient(140deg, #14532d 0%, #052e16 55%, #0b0f14 100%)",
-          }}
-        >
+        <div className="orb-fill flex h-full w-full items-center justify-center rounded-full border-2 border-line">
           <span className="select-none text-[38%] font-bold text-accent" style={{ fontSize: size * 0.34 }}>
             {name.charAt(0)}
           </span>

@@ -1,12 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #4ade80;
-  --color-accent-dim: #22c55e;
-  --color-ink: #0b0f14;
+  /* Brand palette — the single color seam for the whole app.
+     backend/scripts/generate_placeholder_slides.py parses this block, so keep
+     the `--color-name: #hex;` format (one per line). */
+  --color-accent: #4ade80; /* primary brand color; must keep ink legible on bg-accent */
+  --color-accent-dim: #22c55e; /* accent hover state */
+  --color-accent-soft: #ecfdf5; /* user chat-bubble text on accent/15 */
+  --color-accent-soft-2: #d1fae5; /* topic-chip text */
+  --color-ink: #0b0f14; /* page background; button text on accent */
   --color-panel: #11171f;
   --color-panel-2: #161e28;
   --color-line: #1f2937;
+  --color-body: #eceff4; /* default text */
+  --color-muted: #94a3b2; /* slide bullet text (used by the slide script) */
+  --color-scrollbar: #263140;
+  --color-stage-from: #16233a; /* stage backdrop radial gradient */
+  --color-stage-to: #0b1220;
+  --color-orb-glow: #2dd4bf22; /* fallback avatar orb */
+  --color-orb-1: #14532d;
+  --color-orb-2: #052e16;
+  --font-brand: -apple-system, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
 }
 
 html,
@@ -14,8 +29,18 @@ body,
 #root {
   height: 100%;
   background: var(--color-ink);
-  color: #eceff4;
-  font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--color-body);
+  font-family: var(--font-brand);
+}
+
+.stage-backdrop {
+  background: radial-gradient(ellipse at center, var(--color-stage-from) 0%, var(--color-stage-to) 70%);
+}
+
+.orb-fill {
+  background:
+    radial-gradient(circle at 35% 30%, var(--color-orb-glow) 0%, transparent 45%),
+    linear-gradient(140deg, var(--color-orb-1) 0%, var(--color-orb-2) 55%, var(--color-ink) 100%);
 }
 
 @keyframes ringPulse {
@@ -47,4 +72,4 @@ body,
 }
 
 .scroll-thin::-webkit-scrollbar { width: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #263140; border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--color-scrollbar); border-radius: 3px; }

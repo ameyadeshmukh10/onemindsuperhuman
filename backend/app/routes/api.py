@@ -23,6 +23,14 @@ async def health():
     return {"ok": True, "store": get_store().kind}
 
 
+@router.get("/persona")
+async def get_persona():
+    persona = await get_store().get_persona(PERSONA["_id"])
+    if persona is None:
+        raise HTTPException(500, "persona not seeded")
+    return _public_persona(persona)
+
+
 @router.post("/sessions")
 async def create_session():
     store = get_store()

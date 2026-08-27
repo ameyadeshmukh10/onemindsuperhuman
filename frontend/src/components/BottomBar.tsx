@@ -1,4 +1,4 @@
-const BOOK_MEETING_URL = "https://everworker.ai/lets-talk";
+import { brand } from "../brand";
 
 type Props = {
   micOn: boolean;
@@ -21,7 +21,7 @@ export default function BottomBar(props: Props) {
   return (
     <div className="flex items-center justify-between border-t border-line bg-panel px-6 py-3.5">
       <a
-        href={BOOK_MEETING_URL}
+        href={brand.bookMeetingUrl}
         target="_blank"
         rel="noreferrer"
         onClick={onBookMeeting}

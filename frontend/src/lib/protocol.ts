@@ -37,6 +37,12 @@ export type Persona = {
 
 export type SessionInfo = { id: string; persona: Persona };
 
+export async function fetchPersona(): Promise<Persona> {
+  const res = await fetch("/api/persona");
+  if (!res.ok) throw new Error(`fetch persona failed: ${res.status}`);
+  return res.json();
+}
+
 export async function createSession(): Promise<SessionInfo> {
   const res = await fetch("/api/sessions", { method: "POST" });
   if (!res.ok) throw new Error(`create session failed: ${res.status}`);
