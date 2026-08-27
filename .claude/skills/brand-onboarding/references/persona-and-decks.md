@@ -45,9 +45,13 @@ seeding prunes the old items and the generator removes stray dirs.
 - Deck `description` fields are how the model picks a deck: state slide count,
   a one-phrase-per-slide summary, and an explicit "Show when …" trigger,
   mirroring the current file's phrasing.
-- If research genuinely cannot fill an archetype (nothing on trust/security
-  at all), drop that deck from both files and add a VALIDATION item — a
-  missing deck beats an invented one.
+- **Drop rule:** `overview_deck` and `pricing_deck` may never be dropped —
+  the GTM Journeys reference them unconditionally. If research genuinely
+  cannot fill one of the other three archetypes (nothing on trust/security at
+  all), drop that deck — but from `seed_data.py` AND the generator's `DECKS`
+  in the same change (the generator's sync assert fails on a mismatch), and
+  make sure no GTM section (objections especially) still points a visitor at
+  it. Add a VALIDATION item — a missing deck beats an invented one.
 
 ## Presenter-note style (spoken verbatim — source-policy rule 7)
 

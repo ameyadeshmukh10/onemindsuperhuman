@@ -74,7 +74,8 @@ be reconfigured for any B2B company from its website URL with the
 ask Claude Code to "onboard https://company.com". It researches the company
 with a strict no-fabrication policy, applies the configuration, relaunches the
 app, and then walks through a validation checklist with you
-(`onboarding/<company>/VALIDATION.md`). Brand seams it relies on: the
+(`onboarding/<slug>/VALIDATION.md`, where `<slug>` is the lowercase
+hyphenated company name). Brand seams it relies on: the
 `@theme` block in `frontend/src/index.css`, `frontend/src/brand.ts`, and the
 two backend content files above.
 

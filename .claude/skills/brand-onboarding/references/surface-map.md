@@ -26,13 +26,18 @@ Every token must be defined (the slide script asserts `ink`, `panel`, `line`,
 | `--color-orb-glow` / `--color-orb-1` / `--color-orb-2` | fallback avatar orb | accent-hue tints/shades (glow keeps an alpha suffix like `22`) |
 | `--font-brand` | all text | brand font first, then the full existing system-stack fallback |
 
-**Contrast rule (hard):** buttons render `text-ink` on `bg-accent`. If the
-brand primary is too dark for near-black text (relative lightness roughly
-below 55%), use a lighter tint of the same hue as `--color-accent` and the
-brand base as `--color-accent-dim`, and add a VALIDATION item noting the
-adjustment. The app is a dark theme; keep `ink` dark even for light-themed
-brands (their dark neutral or a near-black of their hue) and note that in
-VALIDATION too.
+**Contrast rule (hard):** buttons render `text-ink` on `bg-accent` — verify
+with a computed WCAG contrast ratio, not by eye. Compute relative luminance on
+linearized sRGB (`L = 0.2126R + 0.7152G + 0.0722B`, each channel
+`c/12.92` if `c ≤ 0.03928` else `((c+0.055)/1.055)^2.4`), then
+`ratio = (Llight + 0.05) / (Ldark + 0.05)` — a short
+`uv run --directory backend python -c "..."` does it. Require **≥ 4.5:1** for
+ink-on-accent, body-on-ink, and body-on-panel; if ink-on-accent fails, use a
+lighter tint of the same hue as `--color-accent` and the brand base as
+`--color-accent-dim`, and add a VALIDATION item noting the adjustment (same
+if any other pair had to move off the brand's exact values). The app is a
+dark theme; keep `ink` dark even for light-themed brands (their dark neutral
+or a near-black of their hue) and note that in VALIDATION too.
 
 ## 2. `frontend/index.html`
 
@@ -58,9 +63,13 @@ Google alternative and add a VALIDATION item naming the real font.
 
 Create the directory if missing (Vite snapshots `publicDir` at server start —
 restart `npm run dev` after first creating it). Layout: `favicon.*` at the
-root, everything else under `frontend/public/brand/` (clear that directory
-first on every run). Served at `/` in dev (Vite) and prod (the SPA catch-all
-serves the built `dist/`).
+root, everything else under `frontend/public/brand/`. On every run, delete
+`frontend/public/favicon.*` and clear `frontend/public/brand/` **before**
+placing new assets — a previous brand's favicon must not survive even when no
+replacement was found (in that case also remove the `<link rel="icon">` from
+`index.html` and add a VALIDATION item). Before launch, verify the file the
+`<link rel="icon">` points at actually exists. Served at `/` in dev (Vite)
+and prod (the SPA catch-all serves the built `dist/`).
 
 Persona image: **never fabricate a face.** Leave the
 `backend/content/persona.*` convention alone; the orb fallback recolors via
@@ -74,10 +83,12 @@ the `--color-orb-*` tokens. Offer in VALIDATION: the user may drop a real
   `default_topics`, per `persona-and-decks.md`. Keep `voice_id`,
   `image_path`, and `mic_disclaimer` lines exactly as they are.
 - `SLIDE_DECKS`: replace titles, descriptions, and `presenter_notes` for the
-  five archetype decks. Keep the `_id`/`dir` values from
-  `persona-and-decks.md` (stable across brands so Mongo upserts stay clean).
-  Deck `description` must say *when to show it* — the model picks decks from
-  these lines.
+  retained archetype decks (`overview_deck` and `pricing_deck` are always
+  required; see the drop rule in `persona-and-decks.md`). Keep the `_id`/`dir`
+  values from `persona-and-decks.md` (stable across brands so Mongo upserts
+  stay clean), and keep the retained set identical to the generator's `DECKS`
+  keys — its sync assert fails otherwise. Deck `description` must say *when
+  to show it* — the model picks decks from these lines.
 - `VIDEOS = []` — the previous brand's demo reel must not survive. A new
   video is a VALIDATION request; when the user supplies one, drop it at
   `backend/content/videos/<name>.mp4` and restore a VIDEOS entry for it.
@@ -96,10 +107,11 @@ are data-driven — do not edit them.
 ## 8. Leak sweep (last step of Phase 2)
 
 For each outgoing brand term recorded in Phase 0 (previous company name,
-persona name, wordmark text):
+persona name, wordmark text), skipping empty terms — `-F` makes the match
+fixed-string and `--` guards terms starting with a hyphen:
 
 ```
-grep -ri "<term>" frontend/src frontend/index.html backend/app backend/scripts
+grep -rFi -- "<term>" frontend/src frontend/index.html backend/app backend/scripts
 ```
 
 Every hit is a bug; fix it and re-run until clean. `onboarding/` and

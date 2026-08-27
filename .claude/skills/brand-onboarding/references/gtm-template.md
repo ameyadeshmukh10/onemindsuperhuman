@@ -83,6 +83,9 @@ never synthesize depth the site doesn't have. Up to two topics.>
   line change.
 - **The Hard rules section stays maximal** regardless of how much research
   found — a thin knowledge base needs stronger deflection, not weaker.
-- **Deck ids referenced in Journeys must exist** in the archetype set
-  (`persona-and-decks.md`); the content manifest appended by
-  `build_system_prompt` is generated, so nothing else needs updating.
+- **Deck ids referenced in Journeys must exist.** The Journeys skeleton only
+  references `overview_deck` and the pricing deck, which the drop rule in
+  `persona-and-decks.md` guarantees always exist; if any other section points
+  at a deck (an objection showing the trust deck, say), that deck must be in
+  the retained set. The content manifest appended by `build_system_prompt` is
+  generated, so nothing else needs updating.
